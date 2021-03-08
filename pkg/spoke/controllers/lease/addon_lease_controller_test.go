@@ -32,8 +32,8 @@ func TestSync(t *testing.T) {
 			addonLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
 				expected := metav1.Condition{
-					Type:    "Degraded",
-					Status:  metav1.ConditionTrue,
+					Type:    "Available",
+					Status:  metav1.ConditionFalse,
 					Reason:  "AddonLeaseNotFound",
 					Message: "Addon agent is not found.",
 				}
@@ -48,8 +48,8 @@ func TestSync(t *testing.T) {
 			addonLeases: []runtime.Object{testinghelpers.NewAddonLease(now.Add(-5*time.Minute), "ns1")},
 			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
 				expected := metav1.Condition{
-					Type:    "Degraded",
-					Status:  metav1.ConditionTrue,
+					Type:    "Available",
+					Status:  metav1.ConditionFalse,
 					Reason:  "AddonLeaseUpdateStopped",
 					Message: "Addon agent stopped updating its lease.",
 				}
@@ -64,8 +64,8 @@ func TestSync(t *testing.T) {
 			addonLeases: []runtime.Object{testinghelpers.NewAddonLease(now, "ns1")},
 			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
 				expected := metav1.Condition{
-					Type:    "Degraded",
-					Status:  metav1.ConditionFalse,
+					Type:    "Available",
+					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterLeaseUpdated",
 					Message: "Addon agent is updating its lease.",
 				}
@@ -80,8 +80,8 @@ func TestSync(t *testing.T) {
 			addonLeases: []runtime.Object{testinghelpers.NewAddonLease(now, "ns1"), testinghelpers.NewAddonLease(now, "ns2")},
 			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
 				expected := metav1.Condition{
-					Type:    "Degraded",
-					Status:  metav1.ConditionFalse,
+					Type:    "Available",
+					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterLeaseUpdated",
 					Message: "Addon agent is updating its lease.",
 				}
@@ -99,8 +99,8 @@ func TestSync(t *testing.T) {
 			},
 			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
 				expected := metav1.Condition{
-					Type:    "Degraded",
-					Status:  metav1.ConditionTrue,
+					Type:    "Available",
+					Status:  metav1.ConditionFalse,
 					Reason:  "AddonLeaseUpdateStopped",
 					Message: "Addon agent stopped updating its lease.",
 				}

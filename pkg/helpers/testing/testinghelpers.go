@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	clusterv1 "github.com/open-cluster-management/api/cluster/v1"
 	workapiv1 "github.com/open-cluster-management/api/work/v1"
 
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -59,11 +60,31 @@ func NewFakeSyncContext(t *testing.T, clusterName string) *FakeSyncContext {
 	}
 }
 
+func NewManagedCluster() *clusterv1.ManagedCluster {
+	return &clusterv1.ManagedCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: TestManagedClusterName,
+		},
+	}
+}
+
 func NewAddon() *addonapiv1alpha1.ManagedClusterAddOn {
 	return &addonapiv1alpha1.ManagedClusterAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      TestAddon,
 			Namespace: TestManagedClusterName,
+		},
+	}
+}
+
+func NewAddonManagerLease(renewTime time.Time) *coordv1.Lease {
+	return &coordv1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "addon-lease",
+			Namespace: TestManagedClusterName,
+		},
+		Spec: coordv1.LeaseSpec{
+			RenewTime: &metav1.MicroTime{Time: renewTime},
 		},
 	}
 }

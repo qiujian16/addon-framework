@@ -28,6 +28,9 @@ github.com/emicklei/go-restful/log
 github.com/evanphx/json-patch
 # github.com/getsentry/raven-go v0.0.0-20190513200303-c977f96e1095
 github.com/getsentry/raven-go
+# github.com/ghodss/yaml v1.0.0
+## explicit
+github.com/ghodss/yaml
 # github.com/go-bindata/go-bindata v3.1.2+incompatible
 ## explicit
 github.com/go-bindata/go-bindata
@@ -107,12 +110,82 @@ github.com/open-cluster-management/api/client/addon/informers/externalversions/a
 github.com/open-cluster-management/api/client/addon/informers/externalversions/addon/v1alpha1
 github.com/open-cluster-management/api/client/addon/informers/externalversions/internalinterfaces
 github.com/open-cluster-management/api/client/addon/listers/addon/v1alpha1
+github.com/open-cluster-management/api/client/cluster/clientset/versioned
+github.com/open-cluster-management/api/client/cluster/clientset/versioned/fake
+github.com/open-cluster-management/api/client/cluster/clientset/versioned/scheme
+github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1
+github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1/fake
+github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1
+github.com/open-cluster-management/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1/fake
+github.com/open-cluster-management/api/client/cluster/informers/externalversions
+github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster
+github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1
+github.com/open-cluster-management/api/client/cluster/informers/externalversions/cluster/v1alpha1
+github.com/open-cluster-management/api/client/cluster/informers/externalversions/internalinterfaces
+github.com/open-cluster-management/api/client/cluster/listers/cluster/v1
+github.com/open-cluster-management/api/client/cluster/listers/cluster/v1alpha1
+github.com/open-cluster-management/api/client/work/clientset/versioned
+github.com/open-cluster-management/api/client/work/clientset/versioned/scheme
+github.com/open-cluster-management/api/client/work/clientset/versioned/typed/work/v1
+github.com/open-cluster-management/api/client/work/informers/externalversions
+github.com/open-cluster-management/api/client/work/informers/externalversions/internalinterfaces
+github.com/open-cluster-management/api/client/work/informers/externalversions/work
+github.com/open-cluster-management/api/client/work/informers/externalversions/work/v1
+github.com/open-cluster-management/api/client/work/listers/work/v1
 github.com/open-cluster-management/api/cluster/v1
+github.com/open-cluster-management/api/cluster/v1alpha1
 github.com/open-cluster-management/api/work/v1
 # github.com/openshift/api v0.0.0-20201019163320-c6a5ec25f267
+github.com/openshift/api
+github.com/openshift/api/apps
+github.com/openshift/api/apps/v1
+github.com/openshift/api/authorization
+github.com/openshift/api/authorization/v1
+github.com/openshift/api/build
+github.com/openshift/api/build/v1
+github.com/openshift/api/config
 github.com/openshift/api/config/v1
+github.com/openshift/api/helm
+github.com/openshift/api/helm/v1beta1
+github.com/openshift/api/image
+github.com/openshift/api/image/docker10
+github.com/openshift/api/image/dockerpre012
+github.com/openshift/api/image/v1
+github.com/openshift/api/imageregistry
+github.com/openshift/api/imageregistry/v1
+github.com/openshift/api/kubecontrolplane
+github.com/openshift/api/kubecontrolplane/v1
+github.com/openshift/api/legacyconfig/v1
+github.com/openshift/api/network
+github.com/openshift/api/network/v1
+github.com/openshift/api/oauth
+github.com/openshift/api/oauth/v1
+github.com/openshift/api/openshiftcontrolplane
+github.com/openshift/api/openshiftcontrolplane/v1
+github.com/openshift/api/operator
 github.com/openshift/api/operator/v1
 github.com/openshift/api/operator/v1alpha1
+github.com/openshift/api/operatorcontrolplane
+github.com/openshift/api/operatorcontrolplane/v1alpha1
+github.com/openshift/api/osin
+github.com/openshift/api/osin/v1
+github.com/openshift/api/pkg/serialization
+github.com/openshift/api/project
+github.com/openshift/api/project/v1
+github.com/openshift/api/quota
+github.com/openshift/api/quota/v1
+github.com/openshift/api/route
+github.com/openshift/api/route/v1
+github.com/openshift/api/samples
+github.com/openshift/api/samples/v1
+github.com/openshift/api/security
+github.com/openshift/api/security/v1
+github.com/openshift/api/servicecertsigner
+github.com/openshift/api/servicecertsigner/v1alpha1
+github.com/openshift/api/template
+github.com/openshift/api/template/v1
+github.com/openshift/api/user
+github.com/openshift/api/user/v1
 # github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
 ## explicit
 github.com/openshift/build-machinery-go
@@ -125,6 +198,7 @@ github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
 # github.com/openshift/library-go v0.0.0-20201207213115-a0cd28f38065
 ## explicit
+github.com/openshift/library-go/pkg/assets
 github.com/openshift/library-go/pkg/config/client
 github.com/openshift/library-go/pkg/config/configdefaults
 github.com/openshift/library-go/pkg/config/leaderelection
@@ -137,6 +211,9 @@ github.com/openshift/library-go/pkg/crypto
 github.com/openshift/library-go/pkg/network
 github.com/openshift/library-go/pkg/operator/events
 github.com/openshift/library-go/pkg/operator/events/eventstesting
+github.com/openshift/library-go/pkg/operator/resource/resourceapply
+github.com/openshift/library-go/pkg/operator/resource/resourcehelper
+github.com/openshift/library-go/pkg/operator/resource/resourcemerge
 github.com/openshift/library-go/pkg/operator/v1helpers
 github.com/openshift/library-go/pkg/serviceability
 # github.com/pkg/errors v0.9.1
@@ -355,6 +432,7 @@ k8s.io/api/events/v1
 k8s.io/api/events/v1beta1
 k8s.io/api/extensions/v1beta1
 k8s.io/api/flowcontrol/v1alpha1
+k8s.io/api/imagepolicy/v1alpha1
 k8s.io/api/networking/v1
 k8s.io/api/networking/v1beta1
 k8s.io/api/node/v1alpha1
@@ -370,6 +448,14 @@ k8s.io/api/settings/v1alpha1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
+# k8s.io/apiextensions-apiserver v0.19.2
+k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
+k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
+k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
+k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
+k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
+k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
+k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 # k8s.io/apimachinery v0.19.5
 ## explicit
 k8s.io/apimachinery/pkg/api/equality
@@ -549,6 +635,9 @@ k8s.io/apiserver/plugin/pkg/authorizer/webhook
 ## explicit
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/fake
+k8s.io/client-go/dynamic
+k8s.io/client-go/dynamic/dynamicinformer
+k8s.io/client-go/dynamic/dynamiclister
 k8s.io/client-go/informers
 k8s.io/client-go/informers/admissionregistration
 k8s.io/client-go/informers/admissionregistration/v1
@@ -772,6 +861,12 @@ k8s.io/component-base/version
 # k8s.io/klog/v2 v2.4.0
 ## explicit
 k8s.io/klog/v2
+# k8s.io/kube-aggregator v0.19.2
+k8s.io/kube-aggregator/pkg/apis/apiregistration
+k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
+k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
+k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme
+k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1
 # k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 k8s.io/kube-openapi/pkg/builder
 k8s.io/kube-openapi/pkg/common
@@ -787,6 +882,7 @@ k8s.io/utils/field
 k8s.io/utils/integer
 k8s.io/utils/net
 k8s.io/utils/path
+k8s.io/utils/pointer
 k8s.io/utils/trace
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.9
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client

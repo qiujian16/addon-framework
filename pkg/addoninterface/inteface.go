@@ -11,7 +11,10 @@ import (
 type AgentAddon interface {
 	// AgentManifests returns a list of manifest resources to be deployed on the managed cluster for this addon
 	AgentManifests(cluster *clusterv1.ManagedCluster, config runtime.Object) ([]runtime.Object, error)
+}
 
+type AgentAddonWithRegistration interface {
+	AgentAddon
 	// AgentHubRBAC returns the role and rolebinding on the hub for an agent on the managed cluster.
 	AgentHubRBAC(cluster *clusterv1.ManagedCluster, group string) (*rbacv1.Role, *rbacv1.RoleBinding)
 

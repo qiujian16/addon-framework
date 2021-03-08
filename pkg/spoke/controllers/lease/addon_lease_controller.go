@@ -66,8 +66,8 @@ func (c *addonLeaseController) sync(ctx context.Context, syncCtx factory.SyncCon
 		if err != nil || len(leases) == 0 {
 			conditionFn = helpers.UpdateAddonConditionFn(
 				metav1.Condition{
-					Type:    "Degraded",
-					Status:  metav1.ConditionTrue,
+					Type:    "Available",
+					Status:  metav1.ConditionFalse,
 					Reason:  "AddonLeaseNotFound",
 					Message: "Addon agent is not found.",
 				},
@@ -106,8 +106,8 @@ func (c *addonLeaseController) checkAddonLeases(leases []*coordv1.Lease) metav1.
 	for _, lease := range leases {
 		if now.Before(lease.Spec.RenewTime.Add(gracePeriod)) {
 			return metav1.Condition{
-				Type:    "Degraded",
-				Status:  metav1.ConditionFalse,
+				Type:    "Available",
+				Status:  metav1.ConditionTrue,
 				Reason:  "ManagedClusterLeaseUpdated",
 				Message: "Addon agent is updating its lease.",
 			}
@@ -115,8 +115,8 @@ func (c *addonLeaseController) checkAddonLeases(leases []*coordv1.Lease) metav1.
 	}
 
 	return metav1.Condition{
-		Type:    "Degraded",
-		Status:  metav1.ConditionTrue,
+		Type:    "Available",
+		Status:  metav1.ConditionFalse,
 		Reason:  "AddonLeaseUpdateStopped",
 		Message: "Addon agent stopped updating its lease.",
 	}

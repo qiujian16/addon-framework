@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:managedcluster:{{ .ClusterName }}:addon:{{ .AddonName }}
+rules:
+# Allow agent to rotate its certificate
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests"]
+  verbs: ["create", "get", "list", "watch"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["{{ .AddonName }}/clientcertificates"]
+  verbs: ["renew"]

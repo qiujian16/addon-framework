@@ -3,7 +3,7 @@ package spoke
 import (
 	"context"
 	"errors"
-	"fmt"
+	"io/ioutil"
 	"time"
 
 	"github.com/open-cluster-management/addon-framework/pkg/spoke/controllers/clientcertmanager"
@@ -12,7 +12,6 @@ import (
 	addoninformers "github.com/open-cluster-management/api/client/addon/informers/externalversions"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/spf13/pflag"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -41,6 +40,9 @@ func NewSpokeAgentOptions() *SpokeAgentOptions {
 }
 
 func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext *controllercmd.ControllerContext) error {
+	if err := o.Complete(); err != nil {
+		klog.Fatal(err)
+	}
 	if err := o.Validate(); err != nil {
 		klog.Fatal(err)
 	}
@@ -63,20 +65,17 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	if err != nil {
 		return err
 	}
-	hubKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
+	hubNamespacedKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
 		hubKubeClient, 10*time.Minute,
-		informers.WithTweakListOptions(
-			func(listOptions *metav1.ListOptions) {
-				listOptions.LabelSelector = fmt.Sprintf("open-cluster-management.io/addon-cluster-name=%s", o.ClusterName)
-			},
-		),
+		informers.WithNamespace(o.ClusterName),
 	)
 
 	addonClient, err := addonclient.NewForConfig(hubClientConfig)
 	if err != nil {
 		return err
 	}
-	addonInformerFactory := addoninformers.NewSharedInformerFactory(addonClient, 10*time.Minute)
+	addonInformerFactory := addoninformers.NewSharedInformerFactoryWithOptions(
+		addonClient, 10*time.Minute, addoninformers.WithNamespace(o.ClusterName))
 
 	// create another ClientCertForHubController for client certificate rotation
 	clientCertForHubController := clientcertmanager.NewCertificateManagetController(
@@ -85,7 +84,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		hubClientConfig,
 		hubKubeClient,
 		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-		hubKubeInformerFactory.Core().V1().ConfigMaps(),
+		hubNamespacedKubeInformerFactory.Core().V1().ConfigMaps(),
 		spokeKubeInformerFactory.Core().V1().Secrets(),
 		o.ComponentNamespace,
 		o.ClusterName,
@@ -108,7 +107,7 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		controllerContext.EventRecorder,
 	)
 
-	go hubKubeInformerFactory.Start(ctx.Done())
+	go hubNamespacedKubeInformerFactory.Start(ctx.Done())
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	go addonInformerFactory.Start(ctx.Done())
 
@@ -132,6 +131,19 @@ func (o *SpokeAgentOptions) AddFlags(fs *pflag.FlagSet) {
 func (o *SpokeAgentOptions) Validate() error {
 	if o.ClusterName == "" {
 		return errors.New("cluster name is empty")
+	}
+
+	return nil
+}
+
+// Complete fills in missing values.
+func (o *SpokeAgentOptions) Complete() error {
+	// get component namespace of spoke agent
+	nsBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		o.ComponentNamespace = defaultSpokeComponentNamespace
+	} else {
+		o.ComponentNamespace = string(nsBytes)
 	}
 
 	return nil

@@ -10,8 +10,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	lib/tmp.mk \
 )
 
-$(call add-bindata,registration-agent,./pkg/manager/controllers/registration/manifests/...,bindata,bindata,./pkg/manager/controllers/registration/bindata/bindata.go)
-$(call add-bindata,foundation-agent,./examples/foundation/manifests/...,bindata,bindata,./examples/foundation/bindata/bindata.go)
+$(call add-bindata,registration-agent,./pkg/addonmanager/registration/manifests/...,bindata,bindata,./pkg/addonmanager/registration/bindata/bindata.go)
 
 # Image URL to use all building/pushing image targets;
 IMAGE ?= addon-manager
@@ -34,4 +33,3 @@ $(call build-image,$(IMAGE),$(IMAGE_REGISTRY)/$(IMAGE),./Dockerfile,.)
 
 example:
 	go build -mod=vendor -trimpath github.com/open-cluster-management/addon-framework/examples/helloworld
-	go build -mod=vendor -trimpath github.com/open-cluster-management/addon-framework/examples/foundation

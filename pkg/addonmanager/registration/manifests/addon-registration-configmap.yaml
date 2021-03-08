@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .AddonName }}
+  namespace: {{ .ClusterName }}
+data:
+  signer: {{ .Signer }}
+  bootstrapSecret: {{ .BootstrapSecret }}
+  installNamespace: {{ .AddonNamespace }}

@@ -15,5 +15,5 @@ func NewAgent() *cobra.Command {
 	cmd.Use = "agent"
 	cmd.Short = "Start the Addon Manager Agent"
 	agentOptions.AddFlags(cmd.Flags())
-	return nil
+	return cmd
 }
