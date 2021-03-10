@@ -13,7 +13,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	certificates "k8s.io/api/certificates/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +22,6 @@ import (
 	"k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	corev1lister "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
@@ -44,7 +42,6 @@ type certificateManagerController struct {
 	hubClientConfig      *restclient.Config
 	kubeClient           kubernetes.Interface
 	addonLister          addonlisterv1alpha1.ManagedClusterAddOnLister
-	configMapLister      corev1lister.ConfigMapLister
 	secretInformer       corev1informers.SecretInformer
 	hubKubeClient        kubernetes.Interface
 	csrControllers       map[string]*certificateManager
@@ -74,7 +71,6 @@ func NewCertificateManagetController(
 	hubClientConfig *restclient.Config,
 	hubKubeClient kubernetes.Interface,
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
-	hubConfigMapInformer corev1informers.ConfigMapInformer,
 	secretInformer corev1informers.SecretInformer,
 	componentNamespace string,
 	clusterName string,
@@ -89,7 +85,6 @@ func NewCertificateManagetController(
 		hubKubeClient:      hubKubeClient,
 		secretInformer:     secretInformer,
 		addonLister:        addonInformers.Lister(),
-		configMapLister:    hubConfigMapInformer.Lister(),
 		csrControllers:     map[string]*certificateManager{},
 	}
 
@@ -99,7 +94,7 @@ func NewCertificateManagetController(
 				accessor, _ := meta.Accessor(obj)
 				return accessor.GetName()
 			},
-			hubConfigMapInformer.Informer(), addonInformers.Informer()).
+			addonInformers.Informer()).
 		WithSync(c.sync).
 		ToController("ClientCertManagerController", recorder)
 }
@@ -116,16 +111,13 @@ func (c *certificateManagerController) sync(ctx context.Context, syncCtx factory
 		return err
 	}
 
-	cm, err := c.configMapLister.ConfigMaps(c.clusterName).Get(addonName)
-	switch {
-	case errors.IsNotFound(err):
+	annotation := addon.Annotations
+	if len(annotation) == 0 {
 		return nil
-	case err != nil:
-		return err
 	}
 
-	// read configmap data and start cert controller
-	if cm.Data["enable_registration"] == "false" {
+	// read annotation and start cert controller
+	if annotation["enable_registration"] == "false" {
 		return nil
 	}
 
@@ -155,11 +147,11 @@ func (c *certificateManagerController) sync(ctx context.Context, syncCtx factory
 		return c.removeAddonFinalizer(ctx, addon)
 	}
 
-	signer, bootstrapSecret, hubKubeConfigSecretName, hubKubeConfigSecretNameSpace := readConfigFromConfigMap(cm)
+	signer, bootstrapSecret, hubKubeConfigSecretName, hubKubeConfigSecretNameSpace := readConfigFromConfigMap(addonName, annotation)
 	bootstrapHubKubeClient := c.hubKubeClient
 	bootstrapHubClientConfig := c.hubClientConfig
 	if bootstrapSecret != "" {
-
+		bootstrapHubClientConfig, bootstrapHubKubeClient, err = c.buildClientFromBootstrapSecret(ctx, hubKubeConfigSecretName, hubKubeConfigSecretNameSpace)
 	}
 	certManager, err := c.newCertificateManager(
 		hubKubeConfigSecretName,
@@ -183,6 +175,33 @@ func (c *certificateManagerController) sync(ctx context.Context, syncCtx factory
 
 	c.csrControllers[addonName] = certManager
 	return nil
+}
+
+func (c *certificateManagerController) buildClientFromBootstrapSecret(ctx context.Context, name, namespace string) (*restclient.Config, kubernetes.Interface, error) {
+	secret, err := c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(secret.Data) == 0 {
+		return nil, nil, fmt.Errorf("Empty data in bootstrap secret")
+	}
+	kubeconfigData := secret.Data["kubeconfig"]
+	if len(kubeconfigData) == 0 {
+		return nil, nil, fmt.Errorf("Empty data in bootstrap kubeconfig")
+	}
+
+	cfg, err := clientcmd.NewClientConfigFromBytes(kubeconfigData)
+	if err != nil {
+		return nil, nil, err
+	}
+	restConfig, err := cfg.ClientConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(restConfig)
+	return restConfig, kubeClient, err
 }
 
 func (c *certificateManagerController) newCertificateManager(
@@ -374,13 +393,13 @@ func generateAgentName() string {
 	return utilrand.String(spokeAgentNameLength)
 }
 
-func readConfigFromConfigMap(cm *corev1.ConfigMap) (signer, bootstrapSecret, hubKubeConfigSecretName, hubKubeConfigSecretNameSpace string) {
+func readConfigFromConfigMap(addonName string, annotation map[string]string) (signer, bootstrapSecret, hubKubeConfigSecretName, hubKubeConfigSecretNameSpace string) {
 	signer = certificates.KubeAPIServerClientSignerName
-	if cm.Data["signer"] != "" {
-		signer = cm.Data["signer"]
+	if annotation["signer"] != "" {
+		signer = annotation["signer"]
 	}
-	bootstrapSecret = cm.Data["bootstrapSecret"]
-	hubKubeConfigSecretName = fmt.Sprintf("%s-hub-kubeconfig", cm.Name)
-	hubKubeConfigSecretNameSpace = cm.Data["installNamespace"]
+	bootstrapSecret = annotation["bootstrapSecret"]
+	hubKubeConfigSecretName = fmt.Sprintf("%s-hub-kubeconfig", addonName)
+	hubKubeConfigSecretNameSpace = annotation["installNamespace"]
 	return signer, bootstrapSecret, hubKubeConfigSecretName, hubKubeConfigSecretNameSpace
 }

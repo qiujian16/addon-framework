@@ -77,6 +77,14 @@ func NewAddon() *addonapiv1alpha1.ManagedClusterAddOn {
 	}
 }
 
+func NewAddonWithAnnotation(installNs string) *addonapiv1alpha1.ManagedClusterAddOn {
+	addon := NewAddon()
+	addon.Annotations = map[string]string{
+		"installNamespace": installNs,
+	}
+	return addon
+}
+
 func NewAddonManagerLease(renewTime time.Time) *coordv1.Lease {
 	return &coordv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
@@ -94,9 +102,6 @@ func NewAddonLease(renewTime time.Time, namespace string) *coordv1.Lease {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("open-cluster-management-addon-%s", TestAddon),
 			Namespace: namespace,
-			Labels: map[string]string{
-				"open-cluster-management-addon": TestAddon,
-			},
 		},
 		Spec: coordv1.LeaseSpec{
 			RenewTime: &metav1.MicroTime{Time: renewTime},

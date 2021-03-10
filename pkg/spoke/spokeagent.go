@@ -65,10 +65,6 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 	if err != nil {
 		return err
 	}
-	hubNamespacedKubeInformerFactory := informers.NewSharedInformerFactoryWithOptions(
-		hubKubeClient, 10*time.Minute,
-		informers.WithNamespace(o.ClusterName),
-	)
 
 	addonClient, err := addonclient.NewForConfig(hubClientConfig)
 	if err != nil {
@@ -84,7 +80,6 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		hubClientConfig,
 		hubKubeClient,
 		addonInformerFactory.Addon().V1alpha1().ManagedClusterAddOns(),
-		hubNamespacedKubeInformerFactory.Core().V1().ConfigMaps(),
 		spokeKubeInformerFactory.Core().V1().Secrets(),
 		o.ComponentNamespace,
 		o.ClusterName,
@@ -107,7 +102,6 @@ func (o *SpokeAgentOptions) RunSpokeAgent(ctx context.Context, controllerContext
 		controllerContext.EventRecorder,
 	)
 
-	go hubNamespacedKubeInformerFactory.Start(ctx.Done())
 	go spokeKubeInformerFactory.Start(ctx.Done())
 	go addonInformerFactory.Start(ctx.Done())
 

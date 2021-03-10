@@ -27,8 +27,16 @@ func TestSync(t *testing.T) {
 		validateActions func(t *testing.T, addonActions []clienttesting.Action)
 	}{
 		{
-			name:        "there is no lease for an addon",
+			name:        "there is no annotation for an addon",
 			addons:      []runtime.Object{testinghelpers.NewAddon()},
+			addonLeases: []runtime.Object{},
+			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
+				testinghelpers.AssertNoActions(t, addonActions)
+			},
+		},
+		{
+			name:        "there is no lease for an addon",
+			addons:      []runtime.Object{testinghelpers.NewAddonWithAnnotation("ns1")},
 			addonLeases: []runtime.Object{},
 			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
 				expected := metav1.Condition{
@@ -44,7 +52,7 @@ func TestSync(t *testing.T) {
 		},
 		{
 			name:        "addon agent stop update lease",
-			addons:      []runtime.Object{testinghelpers.NewAddon()},
+			addons:      []runtime.Object{testinghelpers.NewAddonWithAnnotation("ns1")},
 			addonLeases: []runtime.Object{testinghelpers.NewAddonLease(now.Add(-5*time.Minute), "ns1")},
 			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
 				expected := metav1.Condition{
@@ -60,7 +68,7 @@ func TestSync(t *testing.T) {
 		},
 		{
 			name:        "addon agent is available",
-			addons:      []runtime.Object{testinghelpers.NewAddon()},
+			addons:      []runtime.Object{testinghelpers.NewAddonWithAnnotation("ns1")},
 			addonLeases: []runtime.Object{testinghelpers.NewAddonLease(now, "ns1")},
 			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
 				expected := metav1.Condition{
@@ -68,41 +76,6 @@ func TestSync(t *testing.T) {
 					Status:  metav1.ConditionTrue,
 					Reason:  "ManagedClusterLeaseUpdated",
 					Message: "Addon agent is updating its lease.",
-				}
-				testinghelpers.AssertActions(t, addonActions, "get", "update")
-				actual := addonActions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertAddonCondition(t, actual.(*addonapiv1alpha1.ManagedClusterAddOn).Status.Conditions, expected)
-			},
-		},
-		{
-			name:        "multiple leases, one is available",
-			addons:      []runtime.Object{testinghelpers.NewAddon()},
-			addonLeases: []runtime.Object{testinghelpers.NewAddonLease(now, "ns1"), testinghelpers.NewAddonLease(now, "ns2")},
-			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
-				expected := metav1.Condition{
-					Type:    "Available",
-					Status:  metav1.ConditionTrue,
-					Reason:  "ManagedClusterLeaseUpdated",
-					Message: "Addon agent is updating its lease.",
-				}
-				testinghelpers.AssertActions(t, addonActions, "get", "update")
-				actual := addonActions[1].(clienttesting.UpdateActionImpl).Object
-				testinghelpers.AssertAddonCondition(t, actual.(*addonapiv1alpha1.ManagedClusterAddOn).Status.Conditions, expected)
-			},
-		},
-		{
-			name:   "multiple leases, none is available",
-			addons: []runtime.Object{testinghelpers.NewAddon()},
-			addonLeases: []runtime.Object{
-				testinghelpers.NewAddonLease(now.Add(-5*time.Minute), "ns1"),
-				testinghelpers.NewAddonLease(now.Add(-5*time.Minute), "ns2"),
-			},
-			validateActions: func(t *testing.T, addonActions []clienttesting.Action) {
-				expected := metav1.Condition{
-					Type:    "Available",
-					Status:  metav1.ConditionFalse,
-					Reason:  "AddonLeaseUpdateStopped",
-					Message: "Addon agent stopped updating its lease.",
 				}
 				testinghelpers.AssertActions(t, addonActions, "get", "update")
 				actual := addonActions[1].(clienttesting.UpdateActionImpl).Object

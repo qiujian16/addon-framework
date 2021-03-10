@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/open-cluster-management/addon-framework/pkg/helpers"
+	addonapiv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
 	addonv1alpha1client "github.com/open-cluster-management/api/client/addon/clientset/versioned"
 	addoninformerv1alpha1 "github.com/open-cluster-management/api/client/addon/informers/externalversions/addon/v1alpha1"
 	addonlisterv1alpha1 "github.com/open-cluster-management/api/client/addon/listers/addon/v1alpha1"
@@ -62,8 +63,9 @@ func (c *addonLeaseController) sync(ctx context.Context, syncCtx factory.SyncCon
 	}
 	for _, addon := range addons {
 		var conditionFn helpers.UpdateAddonStatusFunc
-		leases, err := c.getLeaseByAddonName(addon.Name)
-		if err != nil || len(leases) == 0 {
+		lease, err := c.getLeaseByAddon(addon)
+		switch {
+		case err != nil:
 			conditionFn = helpers.UpdateAddonConditionFn(
 				metav1.Condition{
 					Type:    "Available",
@@ -72,8 +74,10 @@ func (c *addonLeaseController) sync(ctx context.Context, syncCtx factory.SyncCon
 					Message: "Addon agent is not found.",
 				},
 			)
-		} else {
-			conditionFn = helpers.UpdateAddonConditionFn(c.checkAddonLeases(leases))
+		case lease == nil:
+			return nil
+		default:
+			conditionFn = helpers.UpdateAddonConditionFn(c.checkAddonLeases(lease))
 		}
 
 		_, updated, err := helpers.UpdateAddonStatus(ctx, c.addonClient, c.clusterName, addon.Name, conditionFn)
@@ -89,28 +93,32 @@ func (c *addonLeaseController) sync(ctx context.Context, syncCtx factory.SyncCon
 	return nil
 }
 
-func (c *addonLeaseController) getLeaseByAddonName(addonName string) ([]*coordv1.Lease, error) {
-	selector, _ := labels.Parse(fmt.Sprintf("open-cluster-management-addon=%s", addonName))
-	leases, err := c.leaseLister.List(selector)
+func (c *addonLeaseController) getLeaseByAddon(addon *addonapiv1alpha1.ManagedClusterAddOn) (*coordv1.Lease, error) {
+	if len(addon.Annotations) == 0 {
+		return nil, nil
+	}
+	installNamespace := addon.Annotations["installNamespace"]
+	if len(installNamespace) == 0 {
+		return nil, nil
+	}
+	lease, err := c.leaseLister.Leases(installNamespace).Get(fmt.Sprintf("open-cluster-management-addon-%s", addon.Name))
 	if err != nil {
 		return nil, err
 	}
 
-	return leases, nil
+	return lease, nil
 }
 
 // Check all addon leases, return degraded=False if one lease is valid
-func (c *addonLeaseController) checkAddonLeases(leases []*coordv1.Lease) metav1.Condition {
+func (c *addonLeaseController) checkAddonLeases(lease *coordv1.Lease) metav1.Condition {
 	now := time.Now()
 	gracePeriod := time.Duration(addonLeaseDurationTimes*AddonLeaseDurationSeconds) * time.Second
-	for _, lease := range leases {
-		if now.Before(lease.Spec.RenewTime.Add(gracePeriod)) {
-			return metav1.Condition{
-				Type:    "Available",
-				Status:  metav1.ConditionTrue,
-				Reason:  "ManagedClusterLeaseUpdated",
-				Message: "Addon agent is updating its lease.",
-			}
+	if now.Before(lease.Spec.RenewTime.Add(gracePeriod)) {
+		return metav1.Condition{
+			Type:    "Available",
+			Status:  metav1.ConditionTrue,
+			Reason:  "ManagedClusterLeaseUpdated",
+			Message: "Addon agent is updating its lease.",
 		}
 	}
 

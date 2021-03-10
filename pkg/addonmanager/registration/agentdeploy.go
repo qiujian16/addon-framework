@@ -62,7 +62,6 @@ type registrationAgentDeployController struct {
 type RegistrationConfig struct {
 	AddonName             string
 	AddonInstallNamespace string
-	BootstrapSecret       string
 	SignerName            string
 	ClusterName           string
 	KubeConfig            string
@@ -171,7 +170,6 @@ func (c *registrationAgentDeployController) sync(ctx context.Context, syncCtx fa
 
 	if len(kubeConfigData) > 0 {
 		c.config.KubeConfig = base64.StdEncoding.EncodeToString(kubeConfigData)
-		c.config.BootstrapSecret = fmt.Sprintf("%s-bootstrap-kubeconfig", c.config.AddonName)
 
 		work := &workapiv1.ManifestWork{
 			ObjectMeta: metav1.ObjectMeta{
@@ -259,10 +257,6 @@ func (c *registrationAgentDeployController) removeRegistrationResources(ctx cont
 		return err
 	}
 	err = c.kubeClient.RbacV1().ClusterRoleBindings().Delete(ctx, registratonClusterRoleName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-	err = c.kubeClient.CoreV1().ConfigMaps(cluster.Name).Delete(ctx, c.addonName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}

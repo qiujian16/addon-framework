@@ -3,7 +3,6 @@
 // pkg/addonmanager/registration/manifests/addon-hub-registration-clusterrole.yaml
 // pkg/addonmanager/registration/manifests/addon-hub-registration-clusterrolebinding.yaml
 // pkg/addonmanager/registration/manifests/addon-registration-bootstrap-secret.yaml
-// pkg/addonmanager/registration/manifests/addon-registration-configmap.yaml
 package bindata
 
 import (
@@ -119,7 +118,7 @@ var _pkgAddonmanagerRegistrationManifestsAddonRegistrationBootstrapSecretYaml = 
 kind: Secret
 metadata:
   name: {{ .AddonName }}-bootstrap-kubeconfig
-  namespace: {{ .AddonNamespace }}
+  namespace: {{ .AddonInstallNamespace }}
 data:
   kubeconfig: {{ .KubeConfig }}
 type: Opaque
@@ -136,32 +135,6 @@ func pkgAddonmanagerRegistrationManifestsAddonRegistrationBootstrapSecretYaml() 
 	}
 
 	info := bindataFileInfo{name: "pkg/addonmanager/registration/manifests/addon-registration-bootstrap-secret.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
-var _pkgAddonmanagerRegistrationManifestsAddonRegistrationConfigmapYaml = []byte(`apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ .AddonName }}
-  namespace: {{ .ClusterName }}
-data:
-  signer: {{ .Signer }}
-  bootstrapSecret: {{ .BootstrapSecret }}
-  installNamespace: {{ .AddonNamespace }}
-`)
-
-func pkgAddonmanagerRegistrationManifestsAddonRegistrationConfigmapYamlBytes() ([]byte, error) {
-	return _pkgAddonmanagerRegistrationManifestsAddonRegistrationConfigmapYaml, nil
-}
-
-func pkgAddonmanagerRegistrationManifestsAddonRegistrationConfigmapYaml() (*asset, error) {
-	bytes, err := pkgAddonmanagerRegistrationManifestsAddonRegistrationConfigmapYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "pkg/addonmanager/registration/manifests/addon-registration-configmap.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -221,7 +194,6 @@ var _bindata = map[string]func() (*asset, error){
 	"pkg/addonmanager/registration/manifests/addon-hub-registration-clusterrole.yaml":        pkgAddonmanagerRegistrationManifestsAddonHubRegistrationClusterroleYaml,
 	"pkg/addonmanager/registration/manifests/addon-hub-registration-clusterrolebinding.yaml": pkgAddonmanagerRegistrationManifestsAddonHubRegistrationClusterrolebindingYaml,
 	"pkg/addonmanager/registration/manifests/addon-registration-bootstrap-secret.yaml":       pkgAddonmanagerRegistrationManifestsAddonRegistrationBootstrapSecretYaml,
-	"pkg/addonmanager/registration/manifests/addon-registration-configmap.yaml":              pkgAddonmanagerRegistrationManifestsAddonRegistrationConfigmapYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -272,7 +244,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 					"addon-hub-registration-clusterrole.yaml":        {pkgAddonmanagerRegistrationManifestsAddonHubRegistrationClusterroleYaml, map[string]*bintree{}},
 					"addon-hub-registration-clusterrolebinding.yaml": {pkgAddonmanagerRegistrationManifestsAddonHubRegistrationClusterrolebindingYaml, map[string]*bintree{}},
 					"addon-registration-bootstrap-secret.yaml":       {pkgAddonmanagerRegistrationManifestsAddonRegistrationBootstrapSecretYaml, map[string]*bintree{}},
-					"addon-registration-configmap.yaml":              {pkgAddonmanagerRegistrationManifestsAddonRegistrationConfigmapYaml, map[string]*bintree{}},
 				}},
 			}},
 		}},
