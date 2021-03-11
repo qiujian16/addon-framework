@@ -1,0 +1,24 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: hub-adddon-manager-controller
+  labels:
+    app: hub-adddon-manager-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub-adddon-manager-controller
+  template:
+    metadata:
+      labels:
+        app: hub-adddon-manager-controller
+    spec:
+      serviceAccountName: hub-addon-manager-sa
+      containers:
+      - name: hub-adddon-manager-controller
+        image: quay.io/open-cluster-management/addon-manager:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "/addon-manager"
+          - "manager"
