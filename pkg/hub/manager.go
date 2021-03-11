@@ -8,6 +8,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/open-cluster-management/addon-framework/pkg/hub/controllers/lease"
+	"github.com/open-cluster-management/addon-framework/pkg/hub/controllers/managedcluster"
 	addonclient "github.com/open-cluster-management/api/client/addon/clientset/versioned"
 	addoninformers "github.com/open-cluster-management/api/client/addon/informers/externalversions"
 	clusterv1client "github.com/open-cluster-management/api/client/cluster/clientset/versioned"
@@ -57,11 +58,19 @@ func RunControllerManager(ctx context.Context, controllerContext *controllercmd.
 		controllerContext.EventRecorder,
 	)
 
+	managedClusterController := managedcluster.NewManagedClusterController(
+		kubeClient,
+		clusterClient,
+		clusterInformers.Cluster().V1().ManagedClusters(),
+		controllerContext.EventRecorder,
+	)
+
 	go clusterInformers.Start(ctx.Done())
 	go addonInformerFactory.Start(ctx.Done())
 	go kubeInfomers.Start(ctx.Done())
 
 	go leaseController.Run(ctx, 1)
+	go managedClusterController.Run(ctx, 1)
 
 	<-ctx.Done()
 	return nil

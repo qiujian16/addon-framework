@@ -2,6 +2,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: hub-adddon-manager-controller
+  namespace: open-cluster-management-hub
   labels:
     app: hub-adddon-manager-controller
 spec:

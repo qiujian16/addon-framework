@@ -3,6 +3,13 @@ kind: ClusterRole
 metadata:
   name: open-cluster-management:addon-manager:hub
 rules:
+# Allow addon agent to rotate its certificate
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests"]
+  verbs: ["create", "get", "list", "watch"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["managedclusteraddons/clientcertificates"]
+  verbs: ["renew"]
 # Allow hub to record events
 - apiGroups: ["", "events.k8s.io"]
   resources: ["events"]

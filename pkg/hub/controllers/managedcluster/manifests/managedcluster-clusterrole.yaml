@@ -1,0 +1,22 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: open-cluster-management:managedcluster:addon:{{ .ManagedClusterName }}
+rules:
+# Allow addon agent to rotate its certificate
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests"]
+  verbs: ["create", "get", "list", "watch"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["managedclusteraddons/clientcertificates"]
+  verbs: ["renew"]
+# Allow agent to get/list/update/watch its owner managed cluster
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources: ["managedclusteraddons"]
+  resourceNames: ["{{ .ManagedClusterName }}"]
+  verbs: ["get", "list", "update", "watch"]
+# Allow agent to update the status of its owner managed cluster
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclusteraddons/status"]
+  resourceNames: ["{{ .ManagedClusterName }}"]
+  verbs: ["patch", "update"]

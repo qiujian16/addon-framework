@@ -10,7 +10,8 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	lib/tmp.mk \
 )
 
-$(call add-bindata,registration-agent,./pkg/addonmanager/registration/manifests/...,bindata,bindata,./pkg/addonmanager/registration/bindata/bindata.go)
+$(call add-bindata,addonmanager,./pkg/addonmanager/registration/manifests/...,bindata,bindata,./pkg/addonmanager/registration/bindata/bindata.go)
+$(call add-bindata,addon-hub,./pkg/hub/controllers/managedcluster/manifests/...,bindata,bindata,./pkg/hub/controllers/managedcluster/bindata/bindata.go)
 
 # Image URL to use all building/pushing image targets;
 IMAGE ?= addon-manager
