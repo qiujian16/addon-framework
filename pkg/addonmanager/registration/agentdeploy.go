@@ -25,7 +25,6 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	operatorhelpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,11 +36,6 @@ import (
 
 var registrationAgentFiles = []string{
 	"pkg/manager/controllers/registration/manifests/addon-registration-bootstrap-secret.yaml",
-}
-
-var registrationoHubFiles = []string{
-	"pkg/manager/controllers/registration/manifests/addon-hub-registration-clusterrole.yaml",
-	"pkg/manager/controllers/registration/manifests/addon-hub-registration-clusterrolebinding.yaml",
 }
 
 const registrationFinalizer = "addon.open-cluster-management.io/registration-cleanup"
@@ -215,22 +209,6 @@ func (c *registrationAgentDeployController) sync(ctx context.Context, syncCtx fa
 		}
 	}
 
-	// apply config/acls on hub for registration agent
-	resourceResults := resourceapply.ApplyDirectly(
-		resourceapply.NewKubeClientHolder(c.kubeClient),
-		syncCtx.Recorder(),
-		func(name string) ([]byte, error) {
-			return assets.MustCreateAssetFromTemplate(name, bindata.MustAsset(filepath.Join("", name)), c.config).Data, nil
-		},
-		registrationoHubFiles...,
-	)
-	errs := []error{}
-	for _, result := range resourceResults {
-		if result.Error != nil {
-			errs = append(errs, fmt.Errorf("%q (%T): %v", result.File, result.Type, result.Error))
-		}
-	}
-
 	// Apply rbac on hub
 	role, rolebinding := c.getRbac(cluster)
 	if role != nil {
@@ -247,19 +225,10 @@ func (c *registrationAgentDeployController) sync(ctx context.Context, syncCtx fa
 		}
 
 	}
-	return operatorhelpers.NewMultiLineAggregate(errs)
+	return nil
 }
 
 func (c *registrationAgentDeployController) removeRegistrationResources(ctx context.Context, cluster *clusterv1.ManagedCluster) error {
-	registratonClusterRoleName := fmt.Sprintf("open-cluster-management:managedcluster:%s:addon:%s", cluster.Name, c.addonName)
-	err := c.kubeClient.RbacV1().ClusterRoles().Delete(ctx, registratonClusterRoleName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-	err = c.kubeClient.RbacV1().ClusterRoleBindings().Delete(ctx, registratonClusterRoleName, metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
 	// remove rbacs
 	role, rolebinding := c.getRbac(cluster)
 	if role != nil {
@@ -275,7 +244,7 @@ func (c *registrationAgentDeployController) removeRegistrationResources(ctx cont
 		}
 	}
 
-	return err
+	return nil
 }
 
 func (c *registrationAgentDeployController) removeRegistrationFinalizer(ctx context.Context, addon *addonapiv1alpha1.ManagedClusterAddOn) error {

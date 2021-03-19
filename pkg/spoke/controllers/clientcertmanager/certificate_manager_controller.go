@@ -3,7 +3,6 @@ package clientcertmanager
 import (
 	"context"
 	"fmt"
-	"path"
 	"time"
 
 	addonapiv1alpha1 "github.com/open-cluster-management/api/addon/v1alpha1"
@@ -54,6 +53,7 @@ type certificateManager struct {
 	secretInformer           corev1informers.SecretInformer
 	bootstrapHubKubeClient   kubernetes.Interface
 	bootstrapHubClientConfig *restclient.Config
+	hubKubeClient            kubernetes.Interface
 	clusterName              string
 	agentName                string
 	hubKubeConfigName        string
@@ -163,6 +163,7 @@ func (c *certificateManagerController) sync(ctx context.Context, syncCtx factory
 		bootstrapHubClientConfig,
 		c.secretInformer,
 		c.kubeClient,
+		c.hubKubeClient,
 	)
 	if err != nil {
 		return err
@@ -211,6 +212,7 @@ func (c *certificateManagerController) newCertificateManager(
 	bootstrapHubClientConfig *restclient.Config,
 	secretInformer corev1informers.SecretInformer,
 	kubeClient kubernetes.Interface,
+	hubKubeClient kubernetes.Interface,
 ) (*certificateManager, error) {
 	bootstrapHubKubeClient, err := kubernetes.NewForConfig(bootstrapHubClientConfig)
 	if err != nil {
@@ -225,6 +227,7 @@ func (c *certificateManagerController) newCertificateManager(
 		bootstrapHubClientConfig: bootstrapHubClientConfig,
 		secretInformer:           secretInformer,
 		kubeClient:               kubeClient,
+		hubKubeClient:            hubKubeClient,
 		hubKubeconfigDir:         fmt.Sprintf("%s/%s", baseHubKubeconfigDir, addonName),
 	}
 
@@ -318,13 +321,6 @@ func (cm *certificateManager) start(ctx context.Context, recorder events.Recorde
 
 	certCtx, stopRotate := context.WithCancel(ctx)
 	cm.stopRotate = stopRotate
-	hubKubeconfigSecretController := NewHubKubeconfigSecretController(
-		cm.hubKubeconfigDir, cm.hubKubeConfigNameSpace, cm.hubKubeConfigName,
-		cm.kubeClient.CoreV1(),
-		cm.secretInformer,
-		recorder,
-	)
-	go hubKubeconfigSecretController.Run(certCtx, 1)
 
 	if !ok {
 		// create a ClientCertForHubController for spoke agent bootstrap
@@ -358,25 +354,14 @@ func (cm *certificateManager) start(ctx context.Context, recorder events.Recorde
 		stopBootstrap()
 	}
 
-	// create hub clients and shared informer factories from hub kube config
-	hubClientConfig, err := clientcmd.BuildConfigFromFlags("", path.Join(cm.hubKubeconfigDir, KubeconfigFile))
-	if err != nil {
-		return err
-	}
-
-	hubKubeClient, err := kubernetes.NewForConfig(hubClientConfig)
-	if err != nil {
-		return err
-	}
-
-	hubKubeInformerFactory := informers.NewSharedInformerFactory(hubKubeClient, 10*time.Minute)
+	hubKubeInformerFactory := informers.NewSharedInformerFactory(cm.hubKubeClient, 10*time.Minute)
 
 	// create another ClientCertForHubController for client certificate rotation
 	clientCertForHubController := NewClientCertForHubController(
 		cm.clusterName, cm.agentName, cm.addonName, cm.signer, cm.hubKubeConfigNameSpace, cm.hubKubeConfigName,
-		restclient.AnonymousClientConfig(hubClientConfig),
+		restclient.AnonymousClientConfig(cm.bootstrapHubClientConfig),
 		cm.kubeClient.CoreV1(),
-		hubKubeClient.CertificatesV1().CertificateSigningRequests(),
+		cm.hubKubeClient.CertificatesV1().CertificateSigningRequests(),
 		hubKubeInformerFactory.Certificates().V1().CertificateSigningRequests(),
 		cm.secretInformer,
 		recorder,
