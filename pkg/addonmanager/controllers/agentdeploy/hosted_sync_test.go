@@ -313,6 +313,7 @@ func TestHostingReconcile(t *testing.T) {
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "patch")
 
+				fmt.Printf("patch %v\n", string(actions[0].(clienttesting.PatchActionImpl).Patch))
 				assertHostingClusterValid(t, actions[0])
 
 				patch := actions[0].(clienttesting.PatchActionImpl).Patch

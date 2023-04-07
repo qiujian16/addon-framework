@@ -36,20 +36,22 @@ type hostedSyncer struct {
 func (s *hostedSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, syncerState, error) {
 	// Hosted mode is not enabled, will not deploy any resource on the hosting cluster
 	if !s.agentAddon.GetAgentAddonOptions().HostedModeEnabled {
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 
 	installMode, hostingClusterName := constants.GetHostedModeInfo(addon.GetAnnotations())
 	if installMode != constants.InstallModeHosted {
 		// the installMode is changed from hosted to default, cleanup the hosting resources
 		if err := s.cleanupDeployWork(ctx, addon); err != nil {
-			return addon, err
+			return addon, syncerContinue, err
 		}
-		addonRemoveFinalizer(addon, constants.HostingManifestFinalizer)
-		return addon, nil
+		if addonRemoveFinalizer(addon, constants.HostingManifestFinalizer) {
+			return addon, syncerStop, nil
+		}
+		return addon, syncerContinue, nil
 	}
 
 	// Get Hosting Cluster, check whether the hosting cluster is a managed cluster of the hub
@@ -57,7 +59,11 @@ func (s *hostedSyncer) sync(ctx context.Context,
 	hostingCluster, err := s.getCluster(hostingClusterName)
 	if errors.IsNotFound(err) {
 		if err = s.cleanupDeployWork(ctx, addon); err != nil {
-			return addon, err
+			return addon, syncerContinue, err
+		}
+
+		if addonRemoveFinalizer(addon, constants.HostingManifestFinalizer) {
+			return addon, syncerStop, nil
 		}
 
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
@@ -67,11 +73,10 @@ func (s *hostedSyncer) sync(ctx context.Context,
 			Message: fmt.Sprintf("hosting cluster %s is not a managed cluster of the hub", hostingClusterName),
 		})
 
-		addonRemoveFinalizer(addon, constants.HostingManifestFinalizer)
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 	if err != nil {
-		return addon, err
+		return addon, syncerContinue, err
 	}
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 		Type:    constants.HostingClusterValidity,
@@ -82,43 +87,47 @@ func (s *hostedSyncer) sync(ctx context.Context,
 
 	if !hostingCluster.DeletionTimestamp.IsZero() {
 		if err = s.cleanupDeployWork(ctx, addon); err != nil {
-			return addon, err
+			return addon, syncerContinue, err
 		}
-		addonRemoveFinalizer(addon, constants.HostingManifestFinalizer)
-		return addon, nil
+		if addonRemoveFinalizer(addon, constants.HostingManifestFinalizer) {
+			return addon, syncerStop, nil
+		}
+		return addon, syncerContinue, nil
 	}
 
 	if !addon.DeletionTimestamp.IsZero() {
 		// clean up the deploy work until the hook work is completed
 		if addonHasFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
-			return addon, nil
+			return addon, syncerContinue, nil
 		}
 
 		if err = s.cleanupDeployWork(ctx, addon); err != nil {
-			return addon, err
+			return addon, syncerContinue, err
 		}
-		addonRemoveFinalizer(addon, constants.HostingManifestFinalizer)
-		return addon, nil
+		if addonRemoveFinalizer(addon, constants.HostingManifestFinalizer) {
+			return addon, syncerStop, nil
+		}
+		return addon, syncerContinue, nil
 	}
 
 	if addonAddFinalizer(addon, constants.HostingManifestFinalizer) {
-		return addon, nil
+		return addon, syncerStop, nil
 	}
 
 	// waiting for the addon to be deleted when cluster is deleting.
 	// TODO: consider to delete addon in this scenario.
 	if !cluster.DeletionTimestamp.IsZero() {
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 
 	currentWorks, err := s.getWorkByAddon(addon.Name, addon.Namespace)
 	if err != nil {
-		return addon, err
+		return addon, syncerContinue, err
 	}
 
 	deployWorks, deleteWorks, err := s.buildWorks(constants.InstallModeHosted, hostingClusterName, cluster, currentWorks, addon)
 	if err != nil {
-		return addon, err
+		return addon, syncerContinue, err
 	}
 
 	var errs []error
@@ -136,7 +145,7 @@ func (s *hostedSyncer) sync(ctx context.Context,
 		}
 	}
 
-	return addon, utilerrors.NewAggregate(errs)
+	return addon, syncerContinue, utilerrors.NewAggregate(errs)
 }
 
 // cleanupDeployWork will delete the hosting manifestWork and cache. if the hostingClusterName is empty, will try

@@ -128,7 +128,13 @@ func (c *addonHealthCheckController) syncAddonHealthChecker(ctx context.Context,
 	}
 
 	switch agentAddon.GetAgentAddonOptions().HealthProber.Type {
-	case agent.HealthProberTypeWork, agent.HealthProberTypeNone:
+	case agent.HealthProberTypeWork:
+		// Return nil if manifestwork of the addon has not been applied.
+		if meta.FindStatusCondition(addon.Status.Conditions, constants.AddonManifestApplied) == nil {
+			return nil
+		}
+		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeCustomized
+	case agent.HealthProberTypeNone:
 		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeCustomized
 	case agent.HealthProberTypeLease:
 		expectedHealthCheckMode = addonapiv1alpha1.HealthCheckModeLease
@@ -140,9 +146,7 @@ func (c *addonHealthCheckController) syncAddonHealthChecker(ctx context.Context,
 		addon.Status.HealthCheck.Mode = expectedHealthCheckMode
 		_, err := c.addonClient.AddonV1alpha1().ManagedClusterAddOns(addon.Namespace).
 			UpdateStatus(ctx, addon, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	return c.probeAddonStatus(ctx, addon, agentAddon)

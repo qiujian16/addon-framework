@@ -149,13 +149,12 @@ func (d *managedClusterAddonConfigurationReconciler) mergeAddonConfig(
 }
 
 func (d *managedClusterAddonConfigurationReconciler) patchAddonStatus(ctx context.Context, new, old *addonv1alpha1.ManagedClusterAddOn) error {
-	if equality.Semantic.DeepEqual(new.Status, old.Status) {
+	if equality.Semantic.DeepEqual(new.Status.ConfigReferences, old.Status.ConfigReferences) {
 		return nil
 	}
 
 	oldData, err := json.Marshal(&addonv1alpha1.ManagedClusterAddOn{
 		Status: addonv1alpha1.ManagedClusterAddOnStatus{
-			Namespace:        old.Status.Namespace,
 			ConfigReferences: old.Status.ConfigReferences,
 		},
 	})
@@ -169,7 +168,6 @@ func (d *managedClusterAddonConfigurationReconciler) patchAddonStatus(ctx contex
 			ResourceVersion: new.ResourceVersion,
 		},
 		Status: addonv1alpha1.ManagedClusterAddOnStatus{
-			Namespace:        new.Status.Namespace,
 			ConfigReferences: new.Status.ConfigReferences,
 		},
 	})
@@ -182,7 +180,7 @@ func (d *managedClusterAddonConfigurationReconciler) patchAddonStatus(ctx contex
 		return fmt.Errorf("failed to create patch for addon %s: %w", new.Name, err)
 	}
 
-	klog.Infof("Patching addon %s/%s status with %s", new.Namespace, new.Name, string(patchBytes))
+	klog.V(2).Infof("Patching addon %s/%s status with %s", new.Namespace, new.Name, string(patchBytes))
 	_, err = d.addonClient.AddonV1alpha1().ManagedClusterAddOns(new.Namespace).Patch(
 		ctx, new.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err

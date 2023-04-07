@@ -26,31 +26,33 @@ type defaultHookSyncer struct {
 func (s *defaultHookSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, syncerState, error) {
 	deployWorkNamespace := addon.Namespace
 
 	hookWork, err := s.buildWorks(constants.InstallModeDefault, deployWorkNamespace, cluster, addon)
 	if err != nil {
-		return addon, err
+		return addon, syncerStop, err
 	}
 
 	if hookWork == nil {
-		addonRemoveFinalizer(addon, constants.PreDeleteHookFinalizer)
-		return addon, nil
+		if addonRemoveFinalizer(addon, constants.PreDeleteHookFinalizer) {
+			return addon, syncerStop, nil
+		}
+		return addon, syncerContinue, nil
 	}
 
 	if addonAddFinalizer(addon, constants.PreDeleteHookFinalizer) {
-		return addon, nil
+		return addon, syncerStop, nil
 	}
 
 	if addon.DeletionTimestamp.IsZero() {
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 
 	// will deploy the pre-delete hook manifestWork when the addon is deleting
 	hookWork, err = s.applyWork(ctx, constants.AddonManifestApplied, hookWork, addon)
 	if err != nil {
-		return addon, err
+		return addon, syncerContinue, err
 	}
 
 	// TODO: will surface more message here
@@ -62,8 +64,10 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
 
-		addonRemoveFinalizer(addon, constants.PreDeleteHookFinalizer)
-		return addon, nil
+		if addonRemoveFinalizer(addon, constants.PreDeleteHookFinalizer) {
+			return addon, syncerStop, nil
+		}
+		return addon, syncerContinue, nil
 	}
 
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
@@ -73,5 +77,5 @@ func (s *defaultHookSyncer) sync(ctx context.Context,
 		Message: fmt.Sprintf("hook manifestWork %v is not completed.", hookWork.Name),
 	})
 
-	return addon, nil
+	return addon, syncerContinue, nil
 }

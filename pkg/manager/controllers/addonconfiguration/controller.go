@@ -2,6 +2,8 @@ package addonconfiguration
 
 import (
 	"context"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/client-go/util/workqueue"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,6 +28,7 @@ type addonConfigurationController struct {
 	addonClient                   addonv1alpha1client.Interface
 	clusterManagementAddonLister  addonlisterv1alpha1.ClusterManagementAddOnLister
 	clusterManagementAddonIndexer cache.Indexer
+	workQueue                     workqueue.RateLimitingInterface
 
 	reconcilers []addonConfigurationReconcile
 }
@@ -48,10 +51,12 @@ func NewAddonConfigurationController(
 	placementInformer clusterinformersv1beta1.PlacementInformer,
 	placementDecisionInformer clusterinformersv1beta1.PlacementDecisionInformer,
 ) factory.Controller {
+	syncContext := factory.NewSyncContext("addon-configuration-controller")
 	c := &addonConfigurationController{
 		addonClient:                   addonClient,
 		clusterManagementAddonLister:  clusterManagementAddonInformers.Lister(),
 		clusterManagementAddonIndexer: clusterManagementAddonInformers.Informer().GetIndexer(),
+		workQueue:                     syncContext.Queue(),
 
 		reconcilers: []addonConfigurationReconcile{
 			&managedClusterAddonConfigurationReconciler{
@@ -63,15 +68,31 @@ func NewAddonConfigurationController(
 		},
 	}
 
+	addonInformers.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: c.enqueueAddon,
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			newAddon := newObj.(*addonv1alpha1.ManagedClusterAddOn)
+			oldAddon := oldObj.(*addonv1alpha1.ManagedClusterAddOn)
+			if !apiequality.Semantic.DeepEqual(newAddon.Spec.Configs, oldAddon.Spec.Configs) {
+				c.enqueueAddon(newObj)
+			}
+		},
+	})
+
 	return factory.New().WithInformersQueueKeysFunc(
 		func(obj runtime.Object) []string {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			return []string{key}
-		},
-		addonInformers.Informer(), clusterManagementAddonInformers.Informer()).
+		}, clusterManagementAddonInformers.Informer()).
+		WithBareInformers(addonInformers.Informer()).
 		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementDecisionQueueKey(clusterManagementAddonInformers), placementDecisionInformer.Informer()).
 		WithInformersQueueKeysFunc(index.ClusterManagementAddonByPlacementQueueKey(clusterManagementAddonInformers), placementInformer.Informer()).
 		WithSync(c.sync).ToController("addon-configuration-controller")
+}
+
+func (c *addonConfigurationController) enqueueAddon(obj interface{}) {
+	key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	c.workQueue.Add(key)
 }
 
 func (c *addonConfigurationController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {

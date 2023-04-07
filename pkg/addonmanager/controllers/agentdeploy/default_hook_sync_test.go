@@ -3,7 +3,6 @@ package agentdeploy
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -47,14 +46,7 @@ func TestDefaultHookReconcile(t *testing.T) {
 			testaddon: &testAgent{name: "test", objects: []runtime.Object{
 				addontesting.NewUnstructured("v1", "ConfigMap", "default", "test"),
 				addontesting.NewHookJob("default", "test")}},
-			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "create")
-				actual := actions[0].(clienttesting.CreateActionImpl).Object
-				deployWork := actual.(*workapiv1.ManifestWork)
-				if deployWork.Namespace != "cluster1" || deployWork.Name != fmt.Sprintf("%s-%d", constants.DeployWorkNamePrefix("test"), 0) {
-					t.Errorf("the deployWork %v/%v is incorrect.", deployWork.Namespace, deployWork.Name)
-				}
-			},
+			validateWorkActions: addontesting.AssertNoActions,
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object

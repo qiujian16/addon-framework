@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/workqueue"
+	"open-cluster-management.io/addon-framework/pkg/index"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -30,7 +32,9 @@ const UnsupportedConfigurationType = "UnsupportedConfiguration"
 type addonStatusController struct {
 	addonClient                  addonv1alpha1client.Interface
 	managedClusterAddonLister    addonlisterv1alpha1.ManagedClusterAddOnLister
+	managedClusterAddonIndexer   cache.Indexer
 	clusterManagementAddonLister addonlisterv1alpha1.ClusterManagementAddOnLister
+	queue                        workqueue.RateLimitingInterface
 }
 
 func NewAddonStatusController(
@@ -38,19 +42,42 @@ func NewAddonStatusController(
 	addonInformers addoninformerv1alpha1.ManagedClusterAddOnInformer,
 	clusterManagementAddonInformers addoninformerv1alpha1.ClusterManagementAddOnInformer,
 ) factory.Controller {
+	syncContex := factory.NewSyncContext("addon-status-controller")
 	c := &addonStatusController{
 		addonClient:                  addonClient,
+		managedClusterAddonIndexer:   addonInformers.Informer().GetIndexer(),
 		managedClusterAddonLister:    addonInformers.Lister(),
 		clusterManagementAddonLister: clusterManagementAddonInformers.Lister(),
+		queue:                        syncContex.Queue(),
 	}
+
+	clusterManagementAddonInformers.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: c.enqueueCMA,
+	})
 
 	return factory.New().WithInformersQueueKeysFunc(
 		func(obj runtime.Object) []string {
 			key, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			return []string{key}
-		},
-		addonInformers.Informer()).
+		}, addonInformers.Informer()).
+		WithBareInformers(clusterManagementAddonInformers.Informer()).
+		WithSyncContext(syncContex).
 		WithSync(c.sync).ToController("addon-status-controller")
+}
+
+func (c *addonStatusController) enqueueCMA(obj interface{}) {
+	name, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if err != nil {
+		return
+	}
+	addons, err := c.managedClusterAddonIndexer.ByIndex(index.ManagedClusterAddonByName, name)
+	if err != nil {
+		return
+	}
+	for _, addon := range addons {
+		key, _ := cache.MetaNamespaceKeyFunc(addon)
+		c.queue.Add(key)
+	}
 }
 
 func (c *addonStatusController) sync(ctx context.Context, syncCtx factory.SyncContext, key string) error {
@@ -81,13 +108,13 @@ func (c *addonStatusController) sync(ctx context.Context, syncCtx factory.SyncCo
 			_, err = c.addonClient.AddonV1alpha1().ManagedClusterAddOns(namespace).Update(ctx, addonCopy, metav1.UpdateOptions{})
 			return err
 		}
-
 		// Add related ClusterManagementAddon
 		utils.MergeRelatedObjects(&modified, &addonCopy.Status.RelatedObjects, addonapiv1alpha1.ObjectReference{
 			Name:     clusterManagementAddon.Name,
 			Resource: "clustermanagementaddons",
 			Group:    addonapiv1alpha1.GroupVersion.Group,
 		})
+
 	} else if !errors.IsNotFound(err) {
 		return err
 	}

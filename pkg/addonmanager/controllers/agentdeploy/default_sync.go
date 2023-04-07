@@ -30,29 +30,29 @@ type defaultSyncer struct {
 func (s *defaultSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, syncerState, error) {
 	deployWorkNamespace := addon.Namespace
 
 	var errs []error
 
 	if !addon.DeletionTimestamp.IsZero() {
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 
 	// waiting for the addon to be deleted when cluster is deleting.
 	// TODO: consider to delete addon in this scenario.
 	if !cluster.DeletionTimestamp.IsZero() {
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 
 	currentWorks, err := s.getWorkByAddon(addon.Name, addon.Namespace)
 	if err != nil {
-		return addon, err
+		return addon, syncerContinue, err
 	}
 
 	deployWorks, deleteWorks, err := s.buildWorks(constants.InstallModeDefault, deployWorkNamespace, cluster, currentWorks, addon)
 	if err != nil {
-		return addon, err
+		return addon, syncerContinue, err
 	}
 
 	for _, deleteWork := range deleteWorks {
@@ -69,5 +69,5 @@ func (s *defaultSyncer) sync(ctx context.Context,
 		}
 	}
 
-	return addon, utilerrors.NewAggregate(errs)
+	return addon, syncerContinue, utilerrors.NewAggregate(errs)
 }

@@ -277,6 +277,22 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 				},
 			},
 		}
+		work.Status.Conditions = []metav1.Condition{
+			{
+				Type:               "Applied",
+				Status:             metav1.ConditionTrue,
+				Reason:             "TestApplied",
+				Message:            "",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+			{
+				Type:               "Available",
+				Status:             metav1.ConditionTrue,
+				Reason:             "TestAvailable",
+				Message:            "",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+		}
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -326,6 +342,22 @@ var _ = ginkgo.Describe("Agent deploy", func() {
 						},
 					},
 				},
+			},
+		}
+		work.Status.Conditions = []metav1.Condition{
+			{
+				Type:               "Applied",
+				Status:             metav1.ConditionTrue,
+				Reason:             "TestApplied",
+				Message:            "",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			},
+			{
+				Type:               "Available",
+				Status:             metav1.ConditionTrue,
+				Reason:             "TestAvailable",
+				Message:            "",
+				LastTransitionTime: metav1.NewTime(time.Now()),
 			},
 		}
 		_, err = hubWorkClient.WorkV1().ManifestWorks(managedClusterName).UpdateStatus(context.Background(), work, metav1.UpdateOptions{})

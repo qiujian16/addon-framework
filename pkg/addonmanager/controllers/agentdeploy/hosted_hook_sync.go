@@ -36,16 +36,16 @@ type hostedHookSyncer struct {
 func (s *hostedHookSyncer) sync(ctx context.Context,
 	syncCtx factory.SyncContext,
 	cluster *clusterv1.ManagedCluster,
-	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error) {
+	addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, syncerState, error) {
 
 	// Hosted mode is not enabled, will not deploy any resource on the hosting cluster
 	if !s.agentAddon.GetAgentAddonOptions().HostedModeEnabled {
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 
 	installMode, hostingClusterName := constants.GetHostedModeInfo(addon.GetAnnotations())
 	if installMode != constants.InstallModeHosted {
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 
 	// Get Hosting Cluster, check whether the hosting cluster is a managed cluster of the hub
@@ -53,65 +53,72 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 	hostingCluster, err := s.getCluster(hostingClusterName)
 	if errors.IsNotFound(err) {
 		if err = s.cleanupHookWork(ctx, addon); err != nil {
-			return addon, err
+			return addon, syncerContinue, err
 		}
 
-		addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer)
-		return addon, nil
+		if addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
+			return addon, syncerStop, nil
+		}
+		return addon, syncerContinue, nil
 	}
 	if err != nil {
-		return addon, err
+		return addon, syncerContinue, err
 	}
 
 	if !hostingCluster.DeletionTimestamp.IsZero() {
 		if err = s.cleanupHookWork(ctx, addon); err != nil {
-			return addon, err
+			return addon, syncerContinue, err
 		}
-		addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer)
-		return addon, nil
+		if addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
+			return addon, syncerStop, nil
+		}
+		return addon, syncerContinue, nil
 	}
 	hookWork, err := s.buildWorks(constants.InstallModeHosted, hostingClusterName, cluster, addon)
 	if err != nil {
-		return addon, err
+		return addon, syncerContinue, err
 	}
 
 	if hookWork == nil {
-		addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer)
-		return addon, nil
+		if addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
+			return addon, syncerStop, nil
+		}
+		return addon, syncerContinue, nil
 	}
 
 	// will deploy the pre-delete hook manifestWork when the addon is deleting
 	if addon.DeletionTimestamp.IsZero() {
-		addonAddFinalizer(addon, constants.HostingPreDeleteHookFinalizer)
-		return addon, nil
+		if addonAddFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
+			return addon, syncerStop, nil
+		}
+		return addon, syncerContinue, nil
 	}
 
 	// the hook work is completed if there is no HostingPreDeleteHookFinalizer when the addon is deleting.
 	if !addonHasFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 
 	hookWork, err = s.applyWork(ctx, constants.AddonHostingManifestApplied, hookWork, addon)
 	if err != nil {
-		return addon, err
+		return addon, syncerContinue, err
 	}
 
 	// TODO: will surface more message here
 	if hookWorkIsCompleted(hookWork) {
+		if err = s.cleanupHookWork(ctx, addon); err != nil {
+			return addon, syncerContinue, err
+		}
+		if addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
+			return addon, syncerStop, nil
+		}
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    constants.AddonHookManifestCompleted,
 			Status:  metav1.ConditionTrue,
 			Reason:  "HookManifestIsCompleted",
 			Message: fmt.Sprintf("hook manifestWork %v is completed.", hookWork.Name),
 		})
-
-		if err = s.cleanupHookWork(ctx, addon); err != nil {
-			return addon, err
-		}
-		if addonRemoveFinalizer(addon, constants.HostingPreDeleteHookFinalizer) {
-			return addon, err
-		}
-		return addon, nil
+		return addon, syncerContinue, nil
 	}
 
 	meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
@@ -121,7 +128,7 @@ func (s *hostedHookSyncer) sync(ctx context.Context,
 		Message: fmt.Sprintf("hook manifestWork %v is not completed.", hookWork.Name),
 	})
 
-	return addon, nil
+	return addon, syncerContinue, nil
 
 }
 

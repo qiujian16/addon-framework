@@ -51,9 +51,7 @@ func TestHostingHookReconcile(t *testing.T) {
 				addontesting.NewHostingUnstructured("v1", "ConfigMap", "default", "test"),
 				addontesting.NewHostedHookJob("test", "default"),
 			}},
-			validateWorkActions: func(t *testing.T, actions []clienttesting.Action) {
-				addontesting.AssertActions(t, actions, "create")
-			},
+			validateWorkActions: addontesting.AssertNoActions,
 			validateAddonActions: func(t *testing.T, actions []clienttesting.Action) {
 				addontesting.AssertActions(t, actions, "update")
 				actual := actions[0].(clienttesting.UpdateActionImpl).Object

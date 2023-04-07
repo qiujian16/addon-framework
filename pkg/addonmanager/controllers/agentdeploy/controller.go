@@ -32,6 +32,13 @@ import (
 	"open-cluster-management.io/addon-framework/pkg/utils"
 )
 
+type syncerState int64
+
+const (
+	syncerStop syncerState = iota
+	syncerContinue
+)
+
 // addonDeployController deploy addon agent resources on the managed cluster.
 type addonDeployController struct {
 	workApplier               *workapplier.WorkApplier
@@ -130,7 +137,7 @@ func NewAddonDeployController(
 type addonDeploySyncer interface {
 	sync(ctx context.Context, syncCtx factory.SyncContext,
 		cluster *clusterv1.ManagedCluster,
-		addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, error)
+		addon *addonapiv1alpha1.ManagedClusterAddOn) (*addonapiv1alpha1.ManagedClusterAddOn, syncerState, error)
 }
 
 func (c *addonDeployController) getWorksByAddonFn(index string) func(addonName, addonNamespace string) ([]*workapiv1.ManifestWork, error) {
@@ -169,6 +176,11 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
+	// wait until mca has the unsupported configuration condition.
+	if meta.FindStatusCondition(addon.Status.Conditions, "UnsupportedConfiguration") == nil {
+		return nil
+	}
+
 	cluster, err := c.managedClusterLister.Get(clusterName)
 	if errors.IsNotFound(err) {
 		// the managedCluster is nil in this case,and sync cannot handle nil managedCluster.
@@ -179,21 +191,9 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 		return err
 	}
 
+	// handle hook and hosted mode at first, so if there is any finalizer is needed, syncer is stopped to add
+	// finalizers.
 	syncers := []addonDeploySyncer{
-		&defaultSyncer{
-			buildWorks:     c.buildDeployManifestWorks,
-			applyWork:      c.applyWork,
-			getWorkByAddon: c.getWorksByAddonFn(byAddon),
-			deleteWork:     c.workApplier.Delete,
-			agentAddon:     agentAddon,
-		},
-		&hostedSyncer{
-			buildWorks:     c.buildDeployManifestWorks,
-			applyWork:      c.applyWork,
-			deleteWork:     c.workApplier.Delete,
-			getCluster:     c.managedClusterLister.Get,
-			getWorkByAddon: c.getWorksByAddonFn(byHostedAddon),
-			agentAddon:     agentAddon},
 		&defaultHookSyncer{
 			buildWorks: c.buildHookManifestWork,
 			applyWork:  c.applyWork,
@@ -205,16 +205,34 @@ func (c *addonDeployController) sync(ctx context.Context, syncCtx factory.SyncCo
 			getCluster:     c.managedClusterLister.Get,
 			getWorkByAddon: c.getWorksByAddonFn(hookByHostedAddon),
 			agentAddon:     agentAddon},
+		&hostedSyncer{
+			buildWorks:     c.buildDeployManifestWorks,
+			applyWork:      c.applyWork,
+			deleteWork:     c.workApplier.Delete,
+			getCluster:     c.managedClusterLister.Get,
+			getWorkByAddon: c.getWorksByAddonFn(byHostedAddon),
+			agentAddon:     agentAddon},
+		&defaultSyncer{
+			buildWorks:     c.buildDeployManifestWorks,
+			applyWork:      c.applyWork,
+			getWorkByAddon: c.getWorksByAddonFn(byAddon),
+			deleteWork:     c.workApplier.Delete,
+			agentAddon:     agentAddon,
+		},
 	}
 
 	oldAddon := addon
 	addon = addon.DeepCopy()
 	var errs []error
+	var state syncerState
 	for _, s := range syncers {
 		var err error
-		addon, err = s.sync(ctx, syncCtx, cluster, addon)
+		addon, state, err = s.sync(ctx, syncCtx, cluster, addon)
 		if err != nil {
 			errs = append(errs, err)
+		}
+		if state == syncerStop {
+			break
 		}
 	}
 
@@ -249,8 +267,12 @@ func (c *addonDeployController) applyWork(ctx context.Context, appliedType strin
 		return work, err
 	}
 
+	cond := meta.FindStatusCondition(work.Status.Conditions, workapiv1.WorkApplied)
+	if cond == nil {
+		return work, nil
+	}
 	// Update addon status based on work's status
-	if meta.IsStatusConditionTrue(work.Status.Conditions, workapiv1.WorkApplied) {
+	if cond.Status == metav1.ConditionTrue {
 		meta.SetStatusCondition(&addon.Status.Conditions, metav1.Condition{
 			Type:    appliedType,
 			Status:  metav1.ConditionTrue,
@@ -262,7 +284,7 @@ func (c *addonDeployController) applyWork(ctx context.Context, appliedType strin
 			Type:    appliedType,
 			Status:  metav1.ConditionFalse,
 			Reason:  constants.AddonManifestAppliedReasonManifestsApplyFailed,
-			Message: "failed to apply the manifests of addon",
+			Message: fmt.Sprintf("failed to apply the manifests of addon: %s", cond.Message),
 		})
 	}
 	return work, nil
